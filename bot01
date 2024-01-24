@@ -1,0 +1,175 @@
+import telebot
+from telebot import types
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+from io import BytesIO
+
+matplotlib.use('agg')
+
+bot = telebot.TeleBot("6768536783:AAEFIelMabIDhf1-Pe6BTmdaFetj1fyG5Rw")
+
+
+SIMPLE_GRAPH_INIT = {
+    'type': 'Simple',
+    'type_name': 'Обычный',
+    'name': '',
+    'сategories_cnt': 0,
+    'сategories_names': [],
+    'сategories_values': [],
+}
+
+
+CIRCLE_GRAPH_INIT= {
+    'type': 'Circle',
+    'type_name': 'Круговой',
+    'name': '',
+    'сategories_cnt': 0,
+    'сategories_names': [],
+    'сategories_values': [],
+}
+
+
+SELECTED_GRAPH_TYPE = None
+
+def reset_selected_graph():
+    global SELECTED_GRAPH_TYPE
+    SELECTED_GRAPH_TYPE = None
+
+
+
+
+def select_graph_keyboard(message):
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton(text=SIMPLE_GRAPH_INIT['type_name'], callback_data=SIMPLE_GRAPH_INIT['type']))
+    keyboard.add(types.InlineKeyboardButton(text=CIRCLE_GRAPH_INIT['type_name'], callback_data=CIRCLE_GRAPH_INIT['type']))
+
+    bot.send_message(message.from_user.id, text='Выберите тип графика:', reply_markup=keyboard)
+
+
+@bot.callback_query_handler(func=lambda call: True)
+def keyboard_callback(call):
+    global SELECTED_GRAPH_TYPE
+
+    if call.data == SIMPLE_GRAPH_INIT['type']:
+        SELECTED_GRAPH_TYPE = SIMPLE_GRAPH_INIT
+    elif call.data == CIRCLE_GRAPH_INIT['type']:
+        SELECTED_GRAPH_TYPE = CIRCLE_GRAPH_INIT
+
+    bot.send_message(call.message.chat.id, "Вы выбрали тип {}".format(SELECTED_GRAPH_TYPE['type_name']))
+    bot.send_message(call.message.chat.id, 'Введите название графика')
+
+
+@bot.message_handler(commands=["start"], content_types=['text', 'stickers'])
+def start(message):
+    reset_selected_graph()
+    select_graph_keyboard(message)
+
+
+@bot.message_handler(content_types=['text', 'stickers'])
+def process_message(message):
+    global SELECTED_GRAPH_TYPE
+
+    if SELECTED_GRAPH_TYPE == None:
+        bot.send_message(message.from_user.id, "Для построения графика напишите /start")
+        return
+
+    if SELECTED_GRAPH_TYPE['type'] == SIMPLE_GRAPH_INIT['type']:
+        process_simple_graph(message)
+        return
+
+    if SELECTED_GRAPH_TYPE['type'] == CIRCLE_GRAPH_INIT['type']:
+        process_circle_graph(message)
+        return
+
+
+def process_simple_graph(message):
+    global SELECTED_GRAPH_TYPE
+
+    if SELECTED_GRAPH_TYPE['name'] == '':
+        SELECTED_GRAPH_TYPE['name'] = message.text
+        bot.send_message(message.from_user.id, 'Введите количество категорий')
+        return
+
+    if SELECTED_GRAPH_TYPE['сategories_cnt'] == 0:
+        SELECTED_GRAPH_TYPE['сategories_cnt'] = int(message.text)
+        bot.send_message(message.from_user.id, 'Введите название категории 1 из {}'.format(SELECTED_GRAPH_TYPE['сategories_cnt']))
+        return
+
+    if len(SELECTED_GRAPH_TYPE['сategories_names']) < SELECTED_GRAPH_TYPE['сategories_cnt']:
+        SELECTED_GRAPH_TYPE['сategories_names'].append(message.text)
+
+        if len(SELECTED_GRAPH_TYPE['сategories_names']) < SELECTED_GRAPH_TYPE['сategories_cnt']:
+            bot.send_message(message.from_user.id, 'Введите название категории {} из {}'.format(len(SELECTED_GRAPH_TYPE['сategories_names'])+1, SELECTED_GRAPH_TYPE['сategories_cnt']))
+            return
+
+        bot.send_message(message.from_user.id, 'Введите значение для категории 1 из {}'.format(SELECTED_GRAPH_TYPE['сategories_cnt']))
+        return
+
+    if len(SELECTED_GRAPH_TYPE['сategories_values']) < SELECTED_GRAPH_TYPE['сategories_cnt']:
+        SELECTED_GRAPH_TYPE['сategories_values'].append(int(message.text))
+
+        if len(SELECTED_GRAPH_TYPE['сategories_values']) < SELECTED_GRAPH_TYPE['сategories_cnt']:
+            bot.send_message(message.from_user.id, 'Введите значение для категории {} из {}'.format(len(SELECTED_GRAPH_TYPE['сategories_values'])+1, SELECTED_GRAPH_TYPE['сategories_cnt']))
+            return
+
+    plt.title(SELECTED_GRAPH_TYPE['name'])
+    plt.bar(SELECTED_GRAPH_TYPE['сategories_names'], SELECTED_GRAPH_TYPE['сategories_values'])
+    # plt.show()
+    filename = 'my_plot.png'
+    plt.savefig(filename)
+    bot.send_photo(message.from_user.id, photo=open(filename, 'rb'), caption='Полученный график')
+
+    reset_selected_graph()
+
+
+def process_circle_graph(message):
+    global SELECTED_GRAPH_TYPE
+
+    if SELECTED_GRAPH_TYPE['name'] == '':
+        SELECTED_GRAPH_TYPE['name'] = message.text
+        bot.send_message(message.from_user.id, 'Введите количество категорий')
+        return
+
+    if SELECTED_GRAPH_TYPE['сategories_cnt'] == 0:
+        SELECTED_GRAPH_TYPE['сategories_cnt'] = int(message.text)
+        bot.send_message(message.from_user.id,
+                         'Введите название категории 1 из {}'.format(SELECTED_GRAPH_TYPE['сategories_cnt']))
+        return
+
+    if len(SELECTED_GRAPH_TYPE['сategories_names']) < SELECTED_GRAPH_TYPE['сategories_cnt']:
+        SELECTED_GRAPH_TYPE['сategories_names'].append(message.text)
+
+        if len(SELECTED_GRAPH_TYPE['сategories_names']) < SELECTED_GRAPH_TYPE['сategories_cnt']:
+            bot.send_message(message.from_user.id, 'Введите название категории {} из {}'.format(
+                len(SELECTED_GRAPH_TYPE['сategories_names']) + 1, SELECTED_GRAPH_TYPE['сategories_cnt']))
+            return
+
+        bot.send_message(message.from_user.id,
+                         'Введите значение для категории 1 из {}'.format(SELECTED_GRAPH_TYPE['сategories_cnt']))
+        return
+
+    if len(SELECTED_GRAPH_TYPE['сategories_values']) < SELECTED_GRAPH_TYPE['сategories_cnt']:
+        SELECTED_GRAPH_TYPE['сategories_values'].append(int(message.text))
+
+        if len(SELECTED_GRAPH_TYPE['сategories_values']) < SELECTED_GRAPH_TYPE['сategories_cnt']:
+            bot.send_message(message.from_user.id, 'Введите значение для категории {} из {}'.format(
+                len(SELECTED_GRAPH_TYPE['сategories_values']) + 1, SELECTED_GRAPH_TYPE['сategories_cnt']))
+            return
+
+    plt.title(SELECTED_GRAPH_TYPE['name'])
+    plt.pie(SELECTED_GRAPH_TYPE['сategories_values'], labels = SELECTED_GRAPH_TYPE['сategories_names'])
+    # plt.show()
+
+    filename = 'my_plot.png'
+
+    plt.savefig(filename)
+    bot.send_photo(message.from_user.id, photo=open(filename, 'rb'), caption='Полученный график')
+
+    reset_selected_graph()
+    reset_selected_graph()
+
+
+bot.infinity_polling(none_stop=True, interval=0)
+
+
